@@ -1,0 +1,9 @@
+google-auth
+google-cloud-bigquery
+google-cloud-bigquery-storage
+pandas
+pandas-gbq
+mysql-replication 
+protobuf 
+pymysql
+mysql-connector-python

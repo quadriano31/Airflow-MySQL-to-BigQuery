@@ -1,0 +1,4 @@
+
+*.json
+mysql_data/
+logs/
