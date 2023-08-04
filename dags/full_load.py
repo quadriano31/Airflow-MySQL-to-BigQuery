@@ -14,7 +14,7 @@ from google.oauth2 import service_account
 from packages.config import CONFIG
 
 # Set Google Cloud credentials file path
-os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = '/opt/airflow/dags/key.json'
+os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = '/opt/airflow/dags/keys.json'
 
 
 # Define default_args dictionary for the DAG
@@ -41,7 +41,7 @@ dag = DAG(
 # Define the SQL extract task
 def check_table_exist():
     try:
-        hook = MySqlHook(mysql_conn_id="mysql_conn_id", schema='employees')
+        hook = MySqlHook(mysql_conn_id="mysql_conn_id", schema=CONFIG.DB)
         query = f"""
             SELECT table_name
             FROM information_schema.tables
@@ -94,7 +94,7 @@ def gcp_load(tbl_name):
         # Set write_disposition parameter as WRITE_APPEND for appending to the table
         job_config.write_disposition = bigquery.WriteDisposition.WRITE_TRUNCATE
 
-        hook = MySqlHook(mysql_conn_id="mysql_conn_id", schema='employees')
+        hook = MySqlHook(mysql_conn_id="mysql_conn_id", schema=CONFIG.DB)
 
         for table_name in tbl_name:
             # print(table_name)

@@ -21,5 +21,5 @@ df.tpep_pickup_datetime = pd.to_datetime(df.tpep_pickup_datetime)
 df.tpep_dropoff_datetime = pd.to_datetime(df.tpep_dropoff_datetime)
 
 #print(df.head())
-
-df.to_sql(name="yellow_tripdata",con=conn,index=False)
+print(df.info())
+#df.to_sql(name="yellow_tripdata",con=conn,index=False)
