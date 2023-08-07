@@ -33,24 +33,21 @@ Clone the repo and run docker compose up, Ensure that all containers are healthy
 
 To Download the Employee DB and load to MySQL
 ```bash 
-    run docker container exec -it mysql-container-id /bin/bash 
-    bash curl -LOk https://github.com/datacharmer/test_db/archive/refs/heads/master.zip
-    yum install unzip 
-    cd test_db-master/
-    mysql -t < employees.sql
+    python load_data_to_db.py
 
 ```
 
 ## To Setup MYSQL connection to Airflow 
 
+Run
+
 ```bash
-    run docker network inspect 
-    Copy the gateway  
-    This will be used to setup the connection in airflow 
-    The gateway will be the host the Airflow will use to connect to MySQL 
-    Login -- root
-    Leave password blank 
+    docker network inspect airflow network 
 ```
+Copy the gateway  
+This will be used to setup the connection in airflow 
+The gateway will be the host the Airflow will use to connect to MySQL 
+
 
 
 ## TO ENABLE BIN LOG REPLICATION ON MYSQL 
