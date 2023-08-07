@@ -31,7 +31,7 @@ Clone the repo and run docker compose up, Ensure that all containers are healthy
 
 ## Loading the data to MySQL Server 
 
-To Download the Employee DB and load to MySQL
+To load the Ny_Taxi_data to MySQL
 ```bash 
     python load_data_to_db.py
 
