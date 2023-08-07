@@ -48,66 +48,94 @@ dag_incremental = DAG(
     catchup=False,
     tags=['load_gcp', 'incremental'],
 )
-    
-# Function to extract incremental data from MySQL using Binary Log Reader
-def extract_incremental_data():
+
+# Define the SQL extract task
+def check_table_exist():
     try:
-    
-        # Connect to MySQL database using the Airflow MySQL Hook
-        mysql_hook = MySqlHook(mysql_conn_id="mysql_conn_id")
-        conn: MySQLConnection = mysql_hook.get_conn()
-        cursor: cursor = conn.cursor()
-
-        ###################################
-        # Retrieve the connection details as a dictionary
-        connection_details = mysql_hook.get_connection(conn_id="mysql_conn_id")
-
-        # Access individual elements (host, port, user, passwd) from the dictionary
-        host = connection_details.host
-        port = connection_details.port
-        user = connection_details.login
-        passwd = connection_details.password
-
-        # Initialize a list to store the modified rows
-        modified_rows = []
-
-
-        mysql_settings = {'host': host, 'port': port, 'user': user, 'passwd': ''}
-        # Create the BinLogStreamReader
-        stream = BinLogStreamReader(
-            connection_settings=mysql_settings,
-            server_id=100,
-            only_events=[DeleteRowsEvent, WriteRowsEvent, UpdateRowsEvent],
-            #blocking=True,
-            #resume_stream=True,
-            #log_file='mysql-bin.000001',
-            #log_pos=binlog_pos,
-        )
-
-        # Read the Binary Log and identify modified rows
-        for binlogevent in stream:
-            for row in binlogevent.rows:
-                if isinstance(binlogevent, DeleteRowsEvent):
-                    modified_rows.append({key: str(value) if isinstance(value, date) else value for key, value in row["values"].items()})
-                elif isinstance(binlogevent, UpdateRowsEvent):
-                    modified_rows.append({key: str(value) if isinstance(value, date) else value for key, value in row["after_values"].items()})
-                elif isinstance(binlogevent, WriteRowsEvent):
-                    modified_rows.append({key: str(value) if isinstance(value, date) else value for key, value in row["values"].items()})
-
-        #close stream 
-        stream.close()
-        cursor.close()
-        conn.close()
-
-        return modified_rows
-
+        hook = MySqlHook(mysql_conn_id="mysql_conn_id", schema=CONFIG.DB)
+        query = f"""
+            SELECT table_name
+            FROM information_schema.tables
+            WHERE table_schema = '{CONFIG.DB}' AND table_name = '{CONFIG.TABLE_NAME}'
+        """
+        records = hook.get_records(sql=query)
+        print(records)
+        tbl_name = records[0][0]
+        if tbl_name == CONFIG.TABLE_NAME:
+            return True
+        else:
+            return False
     except Exception as e:
         print("Data extract error: " + str(e))
-        return []
+
+check_table_exist_task = PythonOperator(
+    task_id='check_table_exist',
+    python_callable=check_table_exist,
+    dag=dag_incremental,
+)
+# Function to extract incremental data from MySQL using Binary Log Reader
+def extract_incremental_data(**kwargs):
+    task_instance = kwargs['task_instance']
+    mysql_check_result = task_instance.xcom_pull(task_ids='check_table_exist')
+    
+    if mysql_check_result:
+        try:
+            # Connect to MySQL database using the Airflow MySQL Hook
+            mysql_hook = MySqlHook(mysql_conn_id="mysql_conn_id")
+            conn: MySQLConnection = mysql_hook.get_conn()
+            cursor: cursor = conn.cursor()
+
+            ###################################
+            # Retrieve the connection details as a dictionary
+            connection_details = mysql_hook.get_connection(conn_id="mysql_conn_id")
+
+            # Access individual elements (host, port, user, passwd) from the dictionary
+            host = connection_details.host
+            port = connection_details.port
+            user = connection_details.login
+            passwd = connection_details.password
+
+            # Initialize a list to store the modified rows
+            modified_rows = []
+
+
+            mysql_settings = {'host': host, 'port': port, 'user': user, 'passwd': ''}
+            # Create the BinLogStreamReader
+            stream = BinLogStreamReader(
+                connection_settings=mysql_settings,
+                server_id=100,
+                only_events=[DeleteRowsEvent, WriteRowsEvent, UpdateRowsEvent],
+                #blocking=True,
+                #resume_stream=True,
+                #log_file='mysql-bin.000001',
+                #log_pos=binlog_pos,
+            )
+
+            # Read the Binary Log and identify modified rows
+            for binlogevent in stream:
+                for row in binlogevent.rows:
+                    if isinstance(binlogevent, DeleteRowsEvent):
+                        modified_rows.append({key: str(value) if isinstance(value, date) else value for key, value in row["values"].items()})
+                    elif isinstance(binlogevent, UpdateRowsEvent):
+                        modified_rows.append({key: str(value) if isinstance(value, date) else value for key, value in row["after_values"].items()})
+                    elif isinstance(binlogevent, WriteRowsEvent):
+                        modified_rows.append({key: str(value) if isinstance(value, date) else value for key, value in row["values"].items()})
+
+            #close stream 
+            stream.close()
+            cursor.close()
+            conn.close()
+
+            return modified_rows
+
+        except Exception as e:
+            print("Data extract error: " + str(e))
+            return []
 
 extract_incremental_data_task = PythonOperator(
     task_id='extract_incremental_data',
     python_callable=extract_incremental_data,
+    provide_context=True,
     dag=dag_incremental,
 )
 
@@ -167,4 +195,4 @@ gcp_load_incremental_task = PythonOperator(
 )
 
 # Set task dependencies for the incremental DAG
-extract_incremental_data_task >> create_bigquery_table_task >> gcp_load_incremental_task
+check_table_exist_task >> extract_incremental_data_task >> create_bigquery_table_task >> gcp_load_incremental_task

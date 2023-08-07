@@ -2,7 +2,7 @@ import time
 from datetime import datetime,timedelta
 import os
 
-from airflow.models import DAG
+from airflow.models import DAG, Variable
 from airflow.operators.python_operator import PythonOperator
 from airflow.operators.bash_operator import BashOperator
 
@@ -55,7 +55,7 @@ def check_table_exist():
         print("Data extract error: " + str(e))
 
 check_table_exist_task = PythonOperator(
-    task_id='sql_extract',
+    task_id='check_table_exist',
     python_callable=check_table_exist,
     dag=dag,
 )
